@@ -1,0 +1,5 @@
+glfw
+matplotlib
+numpy
+opencv-contrib-python
+PyOpenGL
