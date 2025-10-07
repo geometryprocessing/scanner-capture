@@ -4,3 +4,4 @@ numpy
 natsort
 opencv-contrib-python
 PyOpenGL
+pyserial
