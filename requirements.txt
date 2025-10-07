@@ -1,5 +1,6 @@
 glfw
 matplotlib
 numpy
+natsort
 opencv-contrib-python
 PyOpenGL
