@@ -297,155 +297,41 @@ class TritonCam(BundleCam):
         if self.debug:
             print(self.name, "finished")
 
-# TOTALLY HACKY WAY
-def writer_process(w: NumpyWriter, xs, meta, file_id):
-    w.process(*xs,meta=meta, file_id=file_id)
-
-
-def camera_loop(c: TritonCam, w: NumpyWriter):
-    file_id: int = 0
-    while True:
-        try:
-            ret = c.process()
-            if ret is not None:
-                xs, meta = ret
-                t=threading.Thread(target=writer_process, args=(w,xs,meta,file_id)) # TOTALLY HACKY WAY
-                t.start()
-                file_id+=1
-                # w.process(*xs, meta=meta)
-        except Exception as e:
-            print(f"Error in camera {c.name}: {e}")
-            c.finish()
-            break
-
-if __name__ == '__main__':
-
-    DEVICE_CONFIGS = [
-        {            
-            'skip': False,
-            'serial_number': '253102176',
-            'model': 'TRX051S-C',
-            'name': 'Triton1',
-            'adc_bit_depth': 'Bits8',   # options are 'Bits8', 'Bits10', 'Bits12'
-            'pixel_format': 'BayerRG8', # options are 'BayerRG8', 'BayerRG10', 'BayerRG12', 'Mono8', 'Mono10', 'Mono12'
-            'fps': 196.,                # needs to be float, can be None if Max FPS available
-            'exposure': 4_700.,         # needs to be float, can be None if Auto Exposure
-            'bundle_size': 20,          # needs to be int
-            'external_trigger': True,
-            'verbose': True,
-            'debug': True,
-            'white_balance': {
-                'BalanceWhiteAuto': 'Off',
-                'BalanceWhiteEnable': False,
-                'wb': [2.382813, 1, 2.314941]
-            },
-            'color_correction': {
-                'ColorTransformationEnable': False,
-                'ccm': [[1., 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, 0]], # 
-            }
-         },
-        {
-            'skip': False,
-            'serial_number': '253102178',
-            'model': 'TRX051S-C',
-            'name': 'Triton2',
-            'adc_bit_depth': 'Bits8',   # options are 'Bits8', 'Bits10', 'Bits12'
-            'pixel_format': 'BayerRG8', # options are 'BayerRG8', 'BayerRG10', 'BayerRG12'
-            'fps': 196.,                # needs to be float, can be None if Max FPS available
-            'exposure': 4_700.,         # needs to be float, can be None if Auto Exposure
-            'bundle_size': 20,          # needs to be int
-            'external_trigger': True,
-            'verbose': True,
-            'debug': True,
-            'white_balance': {
-                'BalanceWhiteAuto': 'Off',
-                'BalanceWhiteEnable': False,
-                'wb': [2.448975, 1, 2.314941]
-            },
-            'color_correction': {
-                'ColorTransformationEnable': False,
-                'ccm': [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, 0]], # 
-            }
-        }]
-
-    cs: list[TritonCam] = []
-    ws: list[NumpyWriter] = []
-    date = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-
+def create_triton(config: dict) -> TritonCam:
     device_infos: list = system.device_infos
     if len(device_infos) == 0:
-        raise RuntimeError("No camera present.")
+        print("No Triton camera detected.")
+        return None
     
-    # try:
-    for config in DEVICE_CONFIGS:
-        if config['skip']:
-            continue      
+    sn = config['serial_number']
+    device_found = False
+    device_info_to_create = None
+    for device_info in device_infos:
+        if device_info['serial'] == sn:
+            device_found = True
+            device_info_to_create = device_info
+            break
 
-        sn = config['serial_number']
-        device_found = False
-        device_info_to_create = None
-        for device_info in device_infos:
-            if device_info['serial'] == sn:
-                device_found = True
-                device_info_to_create = device_info
-                break
+    if not device_found:
+        print('Did not find serial number ', sn)
+        return None
 
-        if device_found is False:
-            print('Did not find serial number ', sn)
-            continue
+    c = TritonCam()
+    c.name = str(config['name'])
+    c.adc_bit_depth = str(config['adc_bit_depth'])
+    c.pixel_format = str(config['pixel_format'])
+    c.fps = float(config['fps'])
+    c.exp = float(config['exposure'])
+    c.bundle = int(config['bundle_size'])
+    c.ext_trigger = bool(config['external_trigger'])
+    c.verbose = bool(config['verbose'])
+    c.debug = bool(config['debug'])
+    c.white_balance = config['white_balance']
+    c.color_correction = config['color_correction']
 
+    device = system.create_device(device_infos=device_info_to_create)[0]
 
-        c = TritonCam()
-        c.name = str(config['name'])
-        c.adc_bit_depth = str(config['adc_bit_depth'])
-        c.pixel_format = str(config['pixel_format'])
-        c.fps = float(config['fps'])
-        c.exp = float(config['exposure'])
-        c.bundle = int(config['bundle_size'])
-        c.ext_trigger = bool(config['external_trigger'])
-        c.verbose = bool(config['verbose'])
-        c.debug = bool(config['debug'])
-        c.white_balance = config['white_balance']
-        c.color_correction = config['color_correction']
-        # c._delay = 1e-3
+    c.init(device)
+    print("Debug:", c.debug, ", Verbose:", c.verbose)
 
-        w = NumpyWriter()
-        w.filename_template = f"F:/triton_{date}/{config['name']}/%d"
-        w.debug = False
-
-        device = system.create_device(device_infos=device_info_to_create)[0]
-
-        c.init(device)
-        print("Debug:", c.debug, ", Verbose:", c.verbose)
-
-        w.init()
-
-        cs.append(c)
-        ws.append(w)
-    # except Exception as e:
-    #     print("something went wrong: ", e)
-
-    #     print("Gracefully exiting")
-    #     system.destroy_device()
-    #     sys.exit()
-
-    if len(cs) == 0:
-        print("No cameras assigned, nothing to do here")
-        system.destroy_device()
-        sys.exit()
-
-    threads = []
-    for c, w in zip(cs, ws):
-        t = threading.Thread(target=camera_loop, name=c.name, args=(c, w), daemon=True)
-        t.start()
-        threads.append(t)
-    
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        for c in cs:
-            c.finish()
-        # destroy all devices
-        system.destroy_device()
-        sys.exit()
+    return c
