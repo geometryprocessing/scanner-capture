@@ -3,5 +3,6 @@ matplotlib
 numpy
 natsort
 opencv-contrib-python
+OpenEXR
 PyOpenGL
 pyserial

@@ -4,6 +4,8 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import OpenEXR
+
 
 def ensure_exists(path: str):
     '''
@@ -146,3 +148,104 @@ def split_patterns(folder_in, folder_out):
             filename = folder_out + "/" + name
             print(name, filename)
             cv2.imwrite(filename, img2[:, :, ::-1])
+
+def load_openexr(filename: str,
+                    make_gray: bool=False,
+                    load_depth: bool=False):
+    """
+    Load .EXR extension image using OpenEXR. These are multi-channel,
+    high-dynamic range images.
+
+    Parameters
+    ----------
+    filename : str
+        path to image file.  
+    make_gray : boolean, optional
+        Flag to convert image to grayscale (True) or keep all three color channels intact (False).
+        Default is False.
+    load_depth : boolean, optional
+        Flag to load the channel distance.Y (True) or not (False).
+        Default is False.
+
+    Returns
+    -------
+    image
+        numpy array (shape NxMx3 if make_gray set to False,
+        shape NxMx1 if make_gray set to True) of image
+    depth (optional)
+        numpy array (shape NxMx1) of depth (only returned if load_depth set to True)
+    """
+    with OpenEXR.File(filename) as infile:
+        if len(infile.header()['channels']) == 3:
+            RGB = infile.channels()["RGB"].pixels
+            d = None
+        elif len(infile.header()['channels']) >= 4:
+            R = infile.header()['channels']["R"].pixels
+            G = infile.header()['channels']["G"].pixels
+            B = infile.header()['channels']["B"].pixels
+            RGB = np.stack([R, G, B], axis=2)
+
+            if load_depth:
+                d = infile.channel()["distance.Y"].pixels
+            else:
+                d = None
+
+        img = convert_to_gray(RGB) if make_gray else RGB
+        if load_depth:
+            return img, d
+        else:
+            return img
+
+
+def save_openexr(filename: str,
+                    image: np.ndarray,
+                    make_gray: bool=True):
+    """
+    Save image with .EXR extension using OpenEXR.
+
+    Parameters
+    ----------
+    filename : str
+        path to file where image will be saved.  
+    image : array_like
+        image array (if only one channel, i.e. grayscale, keeps grayscale)
+    make_gray : boolean, optional
+        Flag to convert RGB image to grayscale (True) or save with all three color channels (False).
+        Default is True.
+
+    Note: this function is compatible with OpenEXR 3.x, not 2.x
+    """
+    if len(image.shape) > 2:
+        if make_gray is True:
+            R = G = B = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY).astype(np.float16)
+        else:
+            R = image[:, :, 0].astype(np.float16)
+            G = image[:, :, 1].astype(np.float16)
+            B = image[:, :, 2].astype(np.float16)
+    else:
+        R = G = B = image.astype(np.float16)
+
+    header = {'compression': OpenEXR.PXR24_COMPRESSION}
+    channels = {'R': R,
+                'G': G,
+                'B': B}
+
+    with OpenEXR.File(header, channels) as outfile:
+        outfile.write(filename)
+
+def convert_to_gray(image: np.ndarray) -> np.ndarray:
+    """
+    Function to convert RGB image to grayscale.
+
+    Parameters
+    ----------
+    image : array_like
+        image array
+
+    Returns
+    ----------
+    grayscale version of image
+    """
+    return (.2989 * image[:,:,0] \
+            + .5870 * image[:,:,1] \
+            + .1140 * image[:,:,2]).astype(image.dtype)
