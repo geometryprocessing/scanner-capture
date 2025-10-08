@@ -185,9 +185,7 @@ class TritonCam(BundleCam):
                 wb = wb_parser(value)
                 for (key, value) in wb:                    
                     self.nm[key].value = value
-                    self.nm[key].value = value
             else:
-                self.nm[key].value = value
                 self.nm[key].value = value
 
         ### TODO: Need to figure out here the color correction matrix.
@@ -200,9 +198,7 @@ class TritonCam(BundleCam):
                 ccm = ccm_parser(value)
                 for (key, value) in ccm:                    
                     self.nm[key].value = value
-                    self.nm[key].value = value
             else:
-                self.nm[key].value = value
                 self.nm[key].value = value
 
         if self.verbose:
