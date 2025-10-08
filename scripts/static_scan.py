@@ -1,3 +1,6 @@
+import sys
+sys.path.append('../')
+
 import os
 import glob
 import time
@@ -11,12 +14,11 @@ from natsort import natsorted
 
 # from termcolor import colored
 plt.switch_backend('agg')
-from display import *
+from src.display import *
 from src.atlas import *
-from stage import *
-from utils import *
-from correct import *
-
+from src.stage import *
+from src.utils import *
+from src.correct import *
 
 def gen_calibration_script(filename, step=5, stops=10, delay=2.0, color=False, dots=False, right=None, left=None, name=None):
     with open("scripts/" + filename, "w") as f:
