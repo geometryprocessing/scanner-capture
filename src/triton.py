@@ -9,8 +9,8 @@ import time
 
 import numpy as np
 
-from bundles import BundleCam
-from numpy_io import NumpyWriter
+from .bundles import BundleCam
+from .numpy_io import NumpyWriter
 
 from arena_api.system import system
 from arena_api.callback import callback, callback_function

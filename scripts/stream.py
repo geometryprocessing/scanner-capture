@@ -51,8 +51,10 @@ DEVICE_CONFIGS = [
 ]
 
 
+
 import sys
-sys.path.append('../')
+import os
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../'))
 from src.numpy_io import NumpyWriter
 from src.triton import TritonCam, create_triton
 from src.basler import BaslerCam, create_basler

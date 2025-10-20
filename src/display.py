@@ -5,7 +5,8 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-import utils
+from .utils import (gen_checker, gen_color,
+      gen_dots, gen_gray, gen_stripes)
 
 # GL
 import glfw
@@ -217,55 +218,55 @@ if __name__ == "__main__":
                     patt[:, :, 0] = np.random.randint(255, size=(H, W))
                     new_pattern = patt
                 if cmd == 'w':
-                    new_pattern = utils.gen_color((H, W), color=(255, 255, 255))
+                    new_pattern = gen_color((H, W), color=(255, 255, 255))
                 if cmd == 'k':
-                    new_pattern = utils.gen_color((H, W), color=(0, 0, 0))
+                    new_pattern = gen_color((H, W), color=(0, 0, 0))
                 if cmd == 'r':
-                    new_pattern = utils.gen_color((H, W), color=(255, 0, 0))
+                    new_pattern = gen_color((H, W), color=(255, 0, 0))
                 if cmd == 'g':
-                    new_pattern = utils.gen_color((H, W), color=(0, 255, 0))
+                    new_pattern = gen_color((H, W), color=(0, 255, 0))
                 if cmd == 'b':
-                    new_pattern = utils.gen_color((H, W), color=(0, 0, 255))
+                    new_pattern = gen_color((H, W), color=(0, 0, 255))
                 if cmd == 'color':
-                    new_pattern = utils.gen_color((H, W), color=(128, 255, 128))
+                    new_pattern = gen_color((H, W), color=(128, 255, 128))
                 if cmd == 'stripes':
-                    new_pattern = utils.gen_stripes((H, W), 1, axis=0)
+                    new_pattern = gen_stripes((H, W), 1, axis=0)
                 if cmd == 'gray':
-                    R, C = utils.gen_gray((H, W), color=[255, 0, 0])
+                    R, C = gen_gray((H, W), color=[255, 0, 0])
                     new_pattern = R[i, :, :, :]
                 if cmd == 'u':
                     i += 1
-                    R, C = utils.gen_gray((H, W), color=[255, 0, 0])
+                    R, C = gen_gray((H, W), color=[255, 0, 0])
                     new_pattern = R[i, :, :, :]
                 if cmd == 'd':
                     i -= 1
-                    R, C = utils.gen_gray((H, W), color=[255, 0, 0])
+                    R, C = gen_gray((H, W), color=[255, 0, 0])
                     new_pattern = R[i, :, :, :]
                 if cmd == 'dots':
-                    new_pattern = utils.gen_dots((H, W), (90 + 50, 60 + 50), (100, 100), (9 - 1, 18 - 1))
+                    new_pattern = gen_dots((H, W), (90 + 50, 60 + 50), (100, 100), (9 - 1, 18 - 1))
                 if cmd == 'checker':
-                    new_pattern = utils.gen_checker((H, W), (90, 60), 100, (9, 18))
+                    new_pattern = gen_checker((H, W), (90, 60), 100, (9, 18))
                 if cmd == 'both':
-                    new_pattern_1 = utils.gen_checker((H, W), (90, 60), 100, (9, 18))
-                    new_pattern_2 = utils.gen_dots((H, W), (90 + 50, 60 + 50), (100, 100), (9 - 1, 18 - 1))
+                    new_pattern_1 = gen_checker((H, W), (90, 60), 100, (9, 18))
+                    new_pattern_2 = gen_dots((H, W), (90 + 50, 60 + 50), (100, 100), (9 - 1, 18 - 1))
                     new_pattern = np.maximum(new_pattern_1, new_pattern_2)
                 if cmd == 'checker r':
-                    new_pattern = utils.gen_checker((H, W), (90, 60), 100, (9, 18))
+                    new_pattern = gen_checker((H, W), (90, 60), 100, (9, 18))
                     new_pattern *= np.array([1, 0, 0], dtype=np.uint8)
                 if cmd == 'checker g':
-                    new_pattern = utils.gen_checker((H, W), (90, 60), 100, (9, 18))
+                    new_pattern = gen_checker((H, W), (90, 60), 100, (9, 18))
                     new_pattern *= np.array([0, 1, 0], dtype=np.uint8)
                 if cmd == 'checker b':
-                    new_pattern = utils.gen_checker((H, W), (90, 60), 100, (9, 18))
+                    new_pattern = gen_checker((H, W), (90, 60), 100, (9, 18))
                     new_pattern *= np.array([0, 0, 1], dtype=np.uint8)
                 if cmd == 'checker t':
-                    # new_pattern = utils.gen_checker((H, W), (60, 160), 100, (7, 16))
-                    new_pattern = utils.gen_checker((H, W), (40, 180), 80, (9, 20))
+                    # new_pattern = gen_checker((H, W), (60, 160), 100, (7, 16))
+                    new_pattern = gen_checker((H, W), (40, 180), 80, (9, 20))
                     new_pattern *= np.array([0, 1, 0], dtype=np.uint8)
                     # new_pattern[H-260:, :, :] = 0
                     new_pattern[H-280:, :, :] = 0
                 if cmd == 'g t':
-                    new_pattern = utils.gen_color((H, W), color=(0, 255, 0))
+                    new_pattern = gen_color((H, W), color=(0, 255, 0))
                     new_pattern[H-280:, :, :] = 0
                 if cmd[:4] == 'load':
                     try:

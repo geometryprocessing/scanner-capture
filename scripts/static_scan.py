@@ -1,6 +1,3 @@
-import sys
-sys.path.append('../')
-
 import os
 import glob
 import time
@@ -14,12 +11,18 @@ from natsort import natsorted
 
 # from termcolor import colored
 plt.switch_backend('agg')
+
+import sys
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../'))
 from src.display import *
 from src.atlas import *
 from src.stage import *
 from src.utils import *
 from src.correct import *
 
+## TODO: move script generation somewhere else?
+## this file should be ONLY for 
+## interactive handling the camera-projector-linear-rotating-stage
 def gen_calibration_script(filename, step=5, stops=10, delay=2.0, color=False, dots=False, right=None, left=None, name=None):
     with open("scripts/" + filename, "w") as f:
         name = name or "calib%s%s%s" % ("_color" if color else "", "_dots" if dots else "", "_sides" if right or left else "")
@@ -165,6 +168,7 @@ def gen_multiscan_script(name, step=10.0, stops=10, delay=2.0, subscript=None):
             f.write("status\n")
 
 
+# TODO: move these to utils
 def safe_int(x, default):
     try:
         return int(x)
@@ -195,7 +199,11 @@ def preload_patterns(path):
             patterns_cache[file] = cv2.imread(file)[:, :, ::-1]
 
 
-if __name__ == "__main__":
+def main(args):
+
+    ## TODO: make args handling here to start scan
+
+
     # gen_calibration_script("calib.script", step=100, stops=4, delay=2.0, color=False, dots=False)
     # gen_calibration_script("calib.script", step=10, stops=33, delay=2.0, color=False, dots=False)
     gen_calibration_script("calib.script", step=5, stops=65, color=False, dots=False)
@@ -251,7 +259,7 @@ if __name__ == "__main__":
     print("\n%d cached patterns:" % len(patterns_cache.keys()), patterns_cache.keys())
     corr = Corrector()
     # dark_path = "D:/Dropbox/work/scanner-old/capture/dark_frames/"
-    dark_path = "./dark_frames/"
+    dark_path = "/atlas_dark_frames/"
 
     supported_commands = ["blank", "stripes", "patterns", "dots", "checker", "color", "gray", "plot", "process",
                           "move", "home", "load", "save", "ldr", "hdr", "ldr_count", "hdr_count", "skip", "exposures",
@@ -490,6 +498,7 @@ if __name__ == "__main__":
                         hdr_name = None
 
                     camera.time_zero()
+                    ## TODO: where is default gamma coming from?
                     hdr = camera.capture_async(hdr_exposures, dark_path=dark_path, gamma=default_gamma, plot=False)
 
                 if cmd == "ldr_count":
@@ -619,3 +628,6 @@ if __name__ == "__main__":
     running = False
     print('Press Enter to exit...')
     thr.join()
+
+if __name__ == '__main__':
+    main(sys.argv[1:])

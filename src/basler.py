@@ -4,8 +4,8 @@ import time
 import datetime
 import numpy as np
 from pypylon import pylon
-from bundles import BundleCam
-from numpy_io import NumpyWriter
+from .bundles import BundleCam
+from .numpy_io import NumpyWriter
 
 import os
 os.environ["PYLON_CAMEMU"] = "0"
@@ -23,6 +23,7 @@ def camera_loop():
             break
 
 class BaslerCam(BundleCam):
+    name = 'BaslerCamera'
     global_time = None  # Global timestamp
     ext_trigger = False  # Use external trigger if True
     pixel_format = "BayerBG8"  # Supported pixel formats: BayerBG8, Mono8
@@ -31,7 +32,7 @@ class BaslerCam(BundleCam):
     fps = None  # Max fps if None
     exp = None  # Auto if None, 0.99e+6/fps if 0, or us otherwise
     cam = None  # Actual camera handle
-    wb = None  # Auto (on start) if None, default (5000 K) if "default", or 3-tuple otherwise
+    white_balance = None  # Auto (on start) if None, default (5000 K) if "default", or 3-tuple otherwise
 
     def init(self, device):
         assert(self.pixel_format in ["BayerBG8", "Mono8"])
@@ -71,7 +72,7 @@ class BaslerCam(BundleCam):
         self.cam.Gain.Value = self.gain
         self.gain = str(self.cam.Gain.Value) + " dB"
 
-        if self.wb is None:
+        if self.white_balance is None:
             self.cam.TriggerMode.Value = "Off"
             self.cam.AcquisitionFrameRateEnable.Value = True
             self.cam.AcquisitionFrameRate.Value = 200
@@ -85,22 +86,22 @@ class BaslerCam(BundleCam):
 
             self.cam.BalanceWhiteAuto.Value = "Off"
             self.optimal_exp = str(self.cam.ExposureTime.Value / 1000.0) + " ms"
-            self.wb = [None] * 3
+            self.white_balance = [None] * 3
 
-        elif self.wb == "default":
-            self.wb = [None] * 3
+        elif self.white_balance == "default":
+            self.white_balance = [None] * 3
 
-        elif type(self.wb) in [list, tuple]:
-            assert(len(self.wb) == 3)
+        elif type(self.white_balance) in [list, tuple]:
+            assert(len(self.white_balance) == 3)
 
             self.cam.BalanceWhiteAuto.Value = "Off"
 
             for i, ch in enumerate(["Red", "Green", "Blue"]):
                 self.cam.BalanceRatioSelector.Value = ch
-                self.cam.BalanceRatio.Value = self.wb[i]
+                self.cam.BalanceRatio.Value = self.white_balance[i]
         else:
-            print("Invalid white balance:", self.wb)
-            self.wb = [None] * 3
+            print("Invalid white balance:", self.white_balance)
+            self.white_balance = [None] * 3
 
         if self.ext_trigger:
             self.cam.AcquisitionFrameRateEnable.Value = False
@@ -121,13 +122,13 @@ class BaslerCam(BundleCam):
 
         for i, ch in enumerate(["Red", "Green", "Blue"]):
             self.cam.BalanceRatioSelector.Value = ch
-            self.wb[i] = self.cam.BalanceRatio.Value
+            self.white_balance[i] = self.cam.BalanceRatio.Value
 
         self.fps = self.fps or self.cam.ResultingFrameRate.Value
 
         print("\nROI:", roi)
         print("Gain:", self.gain)
-        print("White Balance:", self.wb)
+        print("White Balance:", self.white_balance)
         print("Exposure:", self.exposure, "\n")
         print("FPS:", self.fps, "(%.3f)" % self.cam.ResultingFrameRate.Value)
 
@@ -161,7 +162,7 @@ class BaslerCam(BundleCam):
                                 "external_trigger" : self.ext_trigger,
                                 "pixel_format" : self.pixel_format,
                                 "gain" : self.gain,
-                                "white_balance" : self.wb,
+                                "white_balance" : self.white_balance,
                                 "optimal_exposure" : self.optimal_exp,
                                 "exposure" : self.exposure,
                                 "fps" : self.fps,
@@ -207,76 +208,28 @@ class BaslerCam(BundleCam):
         if self.debug:
             print(self.name, "finished")
 
-
-if __name__ == '__main__':
-    cs = []
-    ws = []
-    date = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+def create_basler(config: dict) -> BaslerCam:
+    ## TODO: do the same check for serial number for basler
     tlFactory = pylon.TlFactory.GetInstance()
     devices = tlFactory.EnumerateDevices()
     if len(devices) == 0:
-        raise pylon.RuntimeException("No camera present.")
+        print("No Basler camera detected.")
+        return None, None
 
     for idx, device in enumerate(devices, start=1):
         c = BaslerCam()
-        c.name = f"ConfiguredCam{idx}"
-        c.fps = 200
-        c.exp = 4900
-        c.bundle = 20
-        c.ext_trigger = True
-        c.verbose = True
-        c.debug = True
-        # c.wb = "default"
-        c.wb = [1,1,1]
-        c._delay = 1e-3
 
-        w = NumpyWriter()
-        w.filename_template = f"F:/basler_{date}/device_{idx}/%d"
-        w.verbose = True
-        w.debug = True
+        c.name = str(config['name'])
+        c.pixel_format = str(config['pixel_format'])
+        c.fps = float(config['fps'])
+        c.exp = float(config['exposure'])
+        c.bundle = int(config['bundle_size'])
+        c.ext_trigger = bool(config['external_trigger'])
+        c.verbose = bool(config['verbose'])
+        c.debug = bool(config['debug'])
+        c.white_balance = config['white_balance']
 
         c.init(device)
-        print(c.debug, c.verbose)
+        print("Debug:", c.debug, ", Verbose:", c.verbose)
 
-        w.init()
-
-        cs.append(c)
-        ws.append(w)
-
-    # # for i in range(200):
-    # while True:
-    #     try:
-    #     # print("\n", i)
-    #         for w, c in zip(ws, cs):
-    #             ret = c.process()
-    #             if ret is not None:
-    #                 xs, meta = ret
-    #                 w.process(*xs, meta=meta)
-    #     except:
-    #         for c in cs:
-    #             c.finish()
-    #         sys.exit()
-
-    threads = []
-    for c, w in zip(cs, ws):
-        t = threading.Thread(target=camera_loop, name=c.name, args=(c, w), daemon=True)
-        t.start()
-        threads.append(t)
-    
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        for c in cs:
-            c.finish()
-        sys.exit()
-
-    #     # with c._sw("get_buffer"):
-    #     #     b = c.get_buffer()
-    #     # with c._sw("copy"):
-    #     #     # t = time.time()
-    #     #     frames[i % 8, ...] = b[0]
-    #     #     # print("copy time:", time.time() - t)
-
-    # print(c._sw)
-
+        return c

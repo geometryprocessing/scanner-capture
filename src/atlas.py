@@ -11,7 +11,7 @@ from arena_api.system import system
 from arena_api.callback import callback, callback_function
 # from arena_api.buffer import BufferFactory
 
-from utils import save_openexr, load_openexr
+from .utils import save_openexr, load_openexr
 
 Black = '\u001b[30m'
 Red = '\u001b[31m'

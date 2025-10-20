@@ -8,7 +8,7 @@ from concurrent import futures
 import cv2
 import scipy.ndimage
 
-from utils import *
+from .utils import *
 
 wb_1 = (1.0, 1.0, 1.0)
 
