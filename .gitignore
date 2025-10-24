@@ -169,3 +169,11 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# MacOs
+*.DS_Store
+
+# Project specific
+atlas_dark_frames/
+patterns/
+scripts/
