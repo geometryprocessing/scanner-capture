@@ -132,7 +132,7 @@ class Pattern:
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
 
 class Projector:
-    def __init__(self, settle_frames=3):
+    def __init__(self, settle_frames=1):
         # number of swaps after a pattern change before it is considered on screen
         self.settle_frames = settle_frames
         self.frames_since_change = 0

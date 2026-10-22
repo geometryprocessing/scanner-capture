@@ -24,7 +24,7 @@ Edit `configs/config.json` (git-ignored) for the machine. Relative paths in it a
 | `scripts_dir` | folder with the `*.script` files (`configs/scripts`) |
 | `camera_serial`, `packet_size` | Lucid camera serial number and GigE packet size |
 | `stage` | `{"type": "linear" \| "rotating" \| null, "port": "COM3", "speed_divider": 24}` |
-| `settle_frames` | frames to render after a pattern change before `ldr`/`hdr` |
+| `settle_frames` | frames to render after a pattern change before `ldr`/`hdr` (1: capture right after the new pattern has been swapped in) |
 | `subtract_blank` | passed to `Corrector` |
 | `preload_patterns` | glob (relative to `patterns_root`) of patterns cached at startup |
 | `hdr_exposures`, `ldr_exposure` | initial exposures in seconds |

@@ -6,7 +6,7 @@
     "camera_serial": "194300142",
     "packet_size": 1000,
     "stage": {"type": "linear", "port": "COM3", "speed_divider": 24},
-    "settle_frames": 3,
+    "settle_frames": 1,
     "subtract_blank": false,
     "preload_patterns": "patterns/2026_collection_monochrome/*",
     "hdr_exposures": [0.0167, 0.0333, 0.05, 0.1, 0.25],
