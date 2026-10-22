@@ -558,6 +558,9 @@ def main(args):
         timestamp = time.time()
         delay = 0
         pending = None
+        # Quick commands (no new pattern, no capture started) run back to back without waiting for a frame,
+        # so vsync does not add a frame per command; rendering still happens at least every max_quick_commands
+        quick_commands, max_quick_commands = 0, 50
 
         input_queue.put("checker")
         input_queue.put("status")
@@ -861,6 +864,11 @@ def main(args):
 
                 if cmd == 'exit':
                     break
+
+            if cmd is not None and new_pattern is None and not ldr and not hdr and quick_commands < max_quick_commands:
+                quick_commands += 1
+                continue
+            quick_commands = 0
 
             projector.update(new_pattern)
 
