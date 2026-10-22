@@ -176,4 +176,10 @@ cython_debug/
 # Project specific
 atlas_dark_frames/
 patterns/
-scripts/
+dark_frames/
+configs/config.json
+persist.json
+*.exr
+*.npy
+*.tiff
+configs/scripts/
