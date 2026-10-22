@@ -170,31 +170,39 @@ def load_openexr(filename: str,
     Returns
     -------
     image
-        numpy array (shape NxMx3 if make_gray set to False,
-        shape NxMx1 if make_gray set to True) of image
+        float32 numpy array (shape NxMx3 if make_gray set to False,
+        shape NxM if make_gray set to True) of image
     depth (optional)
-        numpy array (shape NxMx1) of depth (only returned if load_depth set to True)
+        float32 numpy array (shape NxM) of depth, or None if the file has no
+        distance.Y channel (only returned if load_depth set to True)
+
+    Scan EXRs store plain R/G/B channels, simulator EXRs store color.R/G/B
+    and optionally distance.Y; both layouts are accepted.
+
+    Note: this function is compatible with OpenEXR 3.x, not 2.x
     """
-    with OpenEXR.File(filename) as infile:
-        if len(infile.header()['channels']) == 3:
-            RGB = infile.channels()["RGB"].pixels
-            d = None
-        elif len(infile.header()['channels']) >= 4:
-            R = infile.header()['channels']["R"].pixels
-            G = infile.header()['channels']["G"].pixels
-            B = infile.header()['channels']["B"].pixels
-            RGB = np.stack([R, G, B], axis=2)
+    with OpenEXR.File(filename, separate_channels=True) as infile:
+        channels = infile.channels()
 
-            if load_depth:
-                d = infile.channel()["distance.Y"].pixels
-            else:
-                d = None
-
-        img = convert_to_gray(RGB) if make_gray else RGB
-        if load_depth:
-            return img, d
+        for prefix in ("", "color."):
+            names = [prefix + c for c in "RGB"]
+            if all(name in channels for name in names):
+                break
         else:
-            return img
+            raise ValueError("No R/G/B or color.R/G/B channels in %s (found %s)"
+                             % (filename, sorted(channels.keys())))
+
+        RGB = np.stack([channels[name].pixels.astype(np.float32) for name in names], axis=2)
+
+        d = None
+        if load_depth and "distance.Y" in channels:
+            d = channels["distance.Y"].pixels.astype(np.float32)
+
+    img = convert_to_gray(RGB) if make_gray else RGB
+    if load_depth:
+        return img, d
+    else:
+        return img
 
 
 def save_openexr(filename: str,

@@ -3,7 +3,11 @@ import threading
 import time
 import datetime
 import numpy as np
-from pypylon import pylon
+try:
+    from pypylon import pylon
+except ImportError:
+    print("pypylon not installed, Basler cameras not supported")
+    pylon = None
 from .bundles import BundleCam
 from .numpy_io import NumpyWriter
 
