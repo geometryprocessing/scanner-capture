@@ -12,6 +12,7 @@ from arena_api.callback import callback, callback_function
 # from arena_api.buffer import BufferFactory
 
 from .utils import save_openexr, load_openexr
+from .hdr import default_gamma, eps
 
 Black = '\u001b[30m'
 Red = '\u001b[31m'
@@ -39,7 +40,7 @@ def on_buffer(buffer, *args, **kwargs):
     if buffer.is_incomplete:
         cam.ldr = None
     else:
-        p = ctypes.cast(buffer.pdata, ctypes.POINTER(ctypes.c_uint8 if cam.pixel_format == "Mono8" else ctypes.c_uint16))
+        p = ctypes.cast(buffer.pdata, ctypes.POINTER(ctypes.c_uint8 if cam.pixel_format in ["Mono8", "BayerRG8"] else ctypes.c_uint16))
         cam.ldr = np.copy(np.ctypeslib.as_array(p, (buffer.height, buffer.width)))
 
     # ~ 50 ms
@@ -65,6 +66,7 @@ class Camera:
         self.new_ldr, self.new_interval = False, False
         self.intervals = []
         self.counts = None
+        self.dark_frames = {}  # dark frame cache, keyed by file path
         # self.buf = None
 
         self.armed_at, self.triggered_at, self.exposures = [], [], []
@@ -77,21 +79,28 @@ class Camera:
     def now(self):
         return time.time() - self.t0
 
-    def open(self, device_id=0):
+    def open(self, serial_number):
         self.device = None
         self.time_zero()
 
-        devices = system.create_device()
-        print(f'\nCreated {len(devices)} device(s)')
+        device_infos = system.device_infos
+        if len(device_infos) == 0:
+            print(Red + 'No device found!' + Reset)
+            raise RuntimeError("No device found!")
 
-        try:
-            device = devices[device_id]
-        except IndexError as ie:
-            if len(devices) == 0:
-                print(Red + 'No device found!' + Reset)
-            else:
-                print((Red + 'Only %d device(s) available!' + Reset) % len(devices))
-            raise ie
+        device_info_to_create = None
+        for device_info in device_infos:
+            if str(device_info['serial']) == str(serial_number):
+                device_info_to_create = device_info
+                break
+
+        if device_info_to_create is None:
+            available = [str(device_info['serial']) for device_info in device_infos]
+            print(Red + 'Did not find serial number' + Reset)
+            raise RuntimeError("Camera with serial number %s not found, available serial numbers: %s"
+                               % (serial_number, ", ".join(available)))
+
+        device = system.create_device(device_infos=device_info_to_create)[0]
         print(f'Using device:\n\t{device}')
 
         device.nodemap['UserSetSelector'].value = 'Default'
@@ -110,7 +119,7 @@ class Camera:
         print("Destroyed device(s) at %.3f sec" % self.now())
 
     # roi = (Width, Height, OffsetX, OffsetY)
-    def init(self, roi=None, pixel_format="Mono12"):
+    def init(self, roi=None, pixel_format="Mono12", packet_size=1000):
         if self.device:
             nm = self.device.nodemap
 
@@ -136,7 +145,8 @@ class Camera:
             self.device.tl_stream_nodemap['StreamPacketResendEnable'].value = True
             self.device.tl_stream_nodemap['StreamMaxNumResendRequestsPerImage'].value = 100
             self.device.tl_stream_nodemap['StreamAutoNegotiatePacketSize'].value = False
-            self.device.nodemap['GevSCPSPacketSize'].value = 9000
+            # 9000 needs jumbo frames enabled on the NIC
+            self.device.nodemap['GevSCPSPacketSize'].value = packet_size
             print("Packet Size:", nm['GevSCPSPacketSize'].value)
         else:
             raise RuntimeError("No open device!")
@@ -268,7 +278,10 @@ class Camera:
 
             if dark_path:
                 name = "dark_frame_" + str(target_exposures[i]) + "_sec.exr"
-                dark_frame = load_openexr(dark_path + name)
+                dark_frame = self.dark_frames.get(dark_path + name)
+                if dark_frame is None:
+                    dark_frame = load_openexr(dark_path + name, make_gray=True)
+                    self.dark_frames[dark_path + name] = dark_frame
                 image -= dark_frame
                 r, c = np.nonzero(image < 0)
                 image[r, c] = 0
@@ -276,8 +289,11 @@ class Camera:
                     print("Subtracted", name)
 
                 r, c = np.nonzero(dark_frame > 2 ** 10)
-                # Potential index out of bounds error but not with our dark frames)
-                image[r, c] = 0.25 * (image[r, c + 1] + image[r, c - 1] + image[r + 1, c] + image[r - 1, c])
+                # Clamp neighbours so hot pixels on the border don't index out of bounds
+                h, w = image.shape[:2]
+                c0, c1 = np.clip(c - 1, 0, w - 1), np.clip(c + 1, 0, w - 1)
+                r0, r1 = np.clip(r - 1, 0, h - 1), np.clip(r + 1, 0, h - 1)
+                image[r, c] = 0.25 * (image[r, c1] + image[r, c0] + image[r1, c] + image[r0, c])
                 if verbose:
                     print("Replaced %d hot pixel(s) in frame %d" % (r.shape[0], i))
 
@@ -297,9 +313,9 @@ class Camera:
 
         def parallel_computing(image_queue):
             size = (self.roi[1], self.roi[0])
-            total_light = np.zeros(size, dtype=np.float)
-            total_exp = np.zeros(size, dtype=np.float)
-            self.counts = np.zeros(size, dtype=np.int)
+            total_light = np.zeros(size, dtype=np.float32)
+            total_exp = np.zeros(size, dtype=np.float32)
+            self.counts = np.zeros(size, dtype=np.int16)
 
             n = 0
             while n < len(target_exposures):
@@ -314,7 +330,7 @@ class Camera:
                         total_light[r, c] += image[r, c]
                         total_exp[r, c] += real_exp
                         self.counts[r, c] += 1
-                    elif i == len(exposures) - 1:
+                    elif i == len(target_exposures) - 1:
                         ### TODO: what are these eps?
                         r, c = np.nonzero(image < high + eps)
                         total_light[r, c] += image[r, c]
@@ -331,7 +347,8 @@ class Camera:
                     print("%sAdded frame %d%s in %.3f sec" % (Magenta, i, Reset, self.now() - t0))
                     n += 1
 
-            self.hdr = total_light / total_exp
+            # pixels that passed no threshold have zero total exposure, leave them at 0
+            self.hdr = np.divide(total_light, total_exp, out=np.zeros_like(total_light), where=total_exp > 0)
             print(Cyan + "Done computing" + Reset)
 
         print("\nCapturing HDR with %d exposures:" % len(exposures), target_exposures)
@@ -357,6 +374,7 @@ class Camera:
                 plt.pause(0.001)
             else:
                 time.sleep(0.001)
+        executor.shutdown(wait=True)
         # finally:
         #     self.stop_stream()
 
@@ -442,12 +460,12 @@ class Camera:
         plt.tight_layout()
 
 
-def capture_batch(path, exposures, roi=None, pixel_format="Mono12", save_preview=True, plot=True):
+def capture_batch(path, exposures, roi=None, pixel_format="Mono12", save_preview=True, plot=True, *, serial_number):
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
 
     camera = Camera()
-    camera.open()
+    camera.open(serial_number)
     camera.init(roi, pixel_format)
 
     target_exposures = exposures
@@ -481,27 +499,32 @@ def capture_batch(path, exposures, roi=None, pixel_format="Mono12", save_preview
     camera.close()
 
 
-def capture_dark_frames(path, exposures, count=3):
+def capture_dark_frames(path, exposures, count=3, *, serial_number):
     print("Total exposure time:\n\t", np.sum(exposures)*count, "seconds")
     print("Estimated service time:\n\t", 0.2*len(exposures)*count, "seconds")
 
     for exp in exposures:
         full_path = path + "dark_frame_" + str(exp) + "_sec/"
-        capture_batch(full_path, [exp]*count, roi=None, pixel_format="Mono12", save_preview=False, plot=False)
+        capture_batch(full_path, [exp]*count, roi=None, pixel_format="Mono12", save_preview=False, plot=False,
+                      serial_number=serial_number)
 
     with open(path + "exposures.json", "w") as f:
         json.dump(exposures, f)
 
 
 if __name__ == "__main__":
+    import sys
+    # camera serial number, e.g. python -m src.atlas 194300142
+    serial_number = sys.argv[1] if len(sys.argv) > 1 else '194300142'
+
     exposures = [0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75]
                  # 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0]
 
-    # capture_dark_frames("D:/scanner_sim/dark_frames/", exposures, count=100)
+    # capture_dark_frames("D:/scanner_sim/dark_frames/", exposures, count=100, serial_number=serial_number)
     # exit()
 
     camera = Camera()
-    camera.open()
+    camera.open(serial_number)
     camera.init(None, "Mono12")
 
     with camera as cam:
@@ -535,7 +558,8 @@ if __name__ == "__main__":
     # roi = (300, 300, 1000, 3000)
     roi = None
 
-    capture_batch(path, target_exposures, roi, pixel_format="Mono12", save_preview=True, plot=True)
+    capture_batch(path, target_exposures, roi, pixel_format="Mono12", save_preview=True, plot=True,
+                  serial_number=serial_number)
 
     plt.show()
     print('Done')
