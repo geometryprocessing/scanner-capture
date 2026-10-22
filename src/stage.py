@@ -5,6 +5,7 @@ import threading
 
 class LinearStage:
     steps_per_mm = 80
+    read_timeout = 0.05  # s, serial read blocks at most this long
     delimiter = "\r"
 
     def __init__(self, port="COM3", baudrate=115200, debug=False):
@@ -12,7 +13,7 @@ class LinearStage:
         self.running, self.homed, self.ready = False, False, False
 
         self.port, self.baudrate = port, baudrate
-        self.ser = serial.Serial(port=port, baudrate=baudrate, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS)
+        self.ser = serial.Serial(port=port, baudrate=baudrate, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=self.read_timeout)
         self.open = self.ser.isOpen()
 
         if self.debug:
@@ -32,10 +33,10 @@ class LinearStage:
         print("Linear Stage Running")
 
         while self.running:
-            while self.ser.inWaiting() > 0:
-                received += self.ser.read(1).decode("ASCII")
+            # block up to read_timeout instead of busy-polling inWaiting()
+            received += self.ser.read(self.ser.in_waiting or 1).decode("ASCII")
 
-            if self.delimiter in received:
+            while self.delimiter in received:  # drain every complete line before blocking again
                 p = received.find(self.delimiter)
                 resp = received[:p].strip()
                 received = received[p+1:]
@@ -64,6 +65,8 @@ class LinearStage:
         if self.running:
             self.running = False
             self.reader_thread.join()
+        if self.ser.isOpen():
+            self.ser.close()
 
     def home(self, speed_divider=8):
         if not self.running:
@@ -87,7 +90,6 @@ class LinearStage:
 
         self.ready = False
         steps = int(round(dist_mm * self.steps_per_mm))
-        print("steps:", steps)
         self.send("move %d" % steps)
 
         while not self.ready:
@@ -96,6 +98,7 @@ class LinearStage:
 
 class RotatingStage:
     steps_per_deg = 31.205
+    read_timeout = 0.05  # s, serial read blocks at most this long
     delimiter = "\n"
 
     def __init__(self, port="COM3", baudrate=9600, debug=False):
@@ -103,7 +106,7 @@ class RotatingStage:
         self.running, self.ready = False, False
 
         self.port, self.baudrate = port, baudrate
-        self.ser = serial.Serial(port=port, baudrate=baudrate, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS)
+        self.ser = serial.Serial(port=port, baudrate=baudrate, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=self.read_timeout)
         self.open = self.ser.isOpen()
 
         if self.debug:
@@ -123,10 +126,10 @@ class RotatingStage:
         print("Rotating Stage Running")
 
         while self.running:
-            while self.ser.inWaiting() > 0:
-                received += self.ser.read(1).decode("ASCII")
+            # block up to read_timeout instead of busy-polling inWaiting()
+            received += self.ser.read(self.ser.in_waiting or 1).decode("ASCII")
 
-            if self.delimiter in received:
+            while self.delimiter in received:  # drain every complete line before blocking again
                 p = received.find(self.delimiter)
                 resp = received[:p].strip()
                 received = received[p+1:]
@@ -154,6 +157,8 @@ class RotatingStage:
         if self.running:
             self.running = False
             self.reader_thread.join()
+        if self.ser.isOpen():
+            self.ser.close()
 
     def move(self, dist_deg):
         if not self.running:
