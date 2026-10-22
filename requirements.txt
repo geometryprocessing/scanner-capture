@@ -6,3 +6,5 @@ opencv-contrib-python
 OpenEXR
 PyOpenGL
 pyserial
+joblib
+scipy
