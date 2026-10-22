@@ -1,11 +1,59 @@
 ### PLEASE CHANGE THE PARAMETERS HERE BEFORE RUNNING
 DEVICE_CONFIGS = [
     {            
-        'skip': False,
+        'skip': True,
         'maker': 'Triton',
         'serial_number': '253102176',
         'model': 'TRX051S-C',
         'name': 'Triton1',
+        'adc_bit_depth': 'Bits8',   # options are 'Bits8', 'Bits10', 'Bits12'
+        'pixel_format': 'BayerRG8', # options are 'BayerRG8', 'BayerRG10', 'BayerRG12', 'Mono8', 'Mono10', 'Mono12'
+        'fps': 196.,                # needs to be float, can be None if Max FPS available
+        'exposure': 4_700.,         # needs to be float, can be None if Auto Exposure
+        'bundle_size': 30,          # needs to be int
+        'external_trigger': True,
+        'verbose': True,
+        'debug': True,
+        'white_balance': {
+            'BalanceWhiteAuto': 'Off',
+            'BalanceWhiteEnable': False,
+            'wb': [2.382813, 1, 2.314941]
+        },
+        'color_correction': {
+            'ColorTransformationEnable': False,
+            'ccm': [[1., 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, 0]], # 
+        }
+    },
+    {
+        'skip': True,
+        'maker': 'Triton',
+        'serial_number': '253102178',
+        'model': 'TRX051S-C',
+        'name': 'Triton2',
+        'adc_bit_depth': 'Bits8',   # options are 'Bits8', 'Bits10', 'Bits12'
+        'pixel_format': 'BayerRG8', # options are 'BayerRG8', 'BayerRG10', 'BayerRG12'
+        'fps': 196.,                # needs to be float, can be None if Max FPS available
+        'exposure': 4_700.,         # needs to be float, can be None if Auto Exposure
+        'bundle_size': 30,          # needs to be int
+        'external_trigger': True,
+        'verbose': True,
+        'debug': True,
+        'white_balance': {
+            'BalanceWhiteAuto': 'Off',
+            'BalanceWhiteEnable': False,
+            'wb': [2.448975, 1, 2.314941]
+        },
+        'color_correction': {
+            'ColorTransformationEnable': False,
+            'ccm': [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, 0]], # 
+        }
+    },
+    {
+        'skip': False,
+        'maker': 'Triton',
+        'serial_number': '254000443',
+        'model': 'TRX051S-C',
+        'name': 'Triton3',
         'adc_bit_depth': 'Bits8',   # options are 'Bits8', 'Bits10', 'Bits12'
         'pixel_format': 'BayerRG8', # options are 'BayerRG8', 'BayerRG10', 'BayerRG12', 'Mono8', 'Mono10', 'Mono12'
         'fps': 196.,                # needs to be float, can be None if Max FPS available
@@ -23,33 +71,8 @@ DEVICE_CONFIGS = [
             'ColorTransformationEnable': False,
             'ccm': [[1., 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, 0]], # 
         }
-    },
-    {
-        'skip': False,
-        'maker': 'Triton',
-        'serial_number': '253102178',
-        'model': 'TRX051S-C',
-        'name': 'Triton2',
-        'adc_bit_depth': 'Bits8',   # options are 'Bits8', 'Bits10', 'Bits12'
-        'pixel_format': 'BayerRG8', # options are 'BayerRG8', 'BayerRG10', 'BayerRG12'
-        'fps': 196.,                # needs to be float, can be None if Max FPS available
-        'exposure': 4_700.,         # needs to be float, can be None if Auto Exposure
-        'bundle_size': 20,          # needs to be int
-        'external_trigger': True,
-        'verbose': True,
-        'debug': True,
-        'white_balance': {
-            'BalanceWhiteAuto': 'Off',
-            'BalanceWhiteEnable': False,
-            'wb': [2.448975, 1, 2.314941]
-        },
-        'color_correction': {
-            'ColorTransformationEnable': False,
-            'ccm': [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, 0]], # 
-        }
     }
 ]
-
 
 
 import sys
@@ -67,13 +90,15 @@ def create_camera(config, date):
     if config['maker'] == 'Triton':
         c = create_triton(config)
     elif config['maker'] == 'Basler':
-        c = create_basler(config)
+        print("Please ensure the installation for Basler cameras are complete.")
+        print("Once done, uncomment the line below in the scanner-capture/scripts/stream.py script")
+        # c = create_basler(config)
     else:
         print("Unknown camera, currently unsupported")
         return None, None
 
     w = NumpyWriter()
-    w.filename_template = f"F:/triton_{date}/{config['name']}/%d"
+    w.filename_template = f"E:/triton_{date}/{config['name']}/%d"
     w.debug = False
     w.init()
 
