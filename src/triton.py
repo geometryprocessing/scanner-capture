@@ -153,32 +153,32 @@ class TritonCam(BundleCam):
         self.device.tl_stream_nodemap['StreamMaxNumResendRequestsPerImage'].value = 100
         self.device.tl_stream_nodemap['StreamAutoNegotiatePacketSize'].value = False
         self.nm['GevSCPSPacketSize'].value = 9_000
+        self.nm['TransportStreamProtocol'].value = 'RDMA'
         print("Packet Size:", self.nm['GevSCPSPacketSize'].value)
 
-        if self.ext_trigger:
-            self.nm['TriggerMode'].value = "On"
-            self.nm['AcquisitionFrameRateEnable'].value = False
-            self.nm['TriggerSource'].value = 'Line2'
-            self.nm['TriggerActivation'].value = 'FallingEdge'
-            self.nm['TriggerOverlap'].value = 'PreviousFrame'
-        else:
-            self.nm['TriggerMode'].value = "Off"
-            self.nm['AcquisitionFrameRateEnable'].value = True
-            self.nm['TriggerSource'].value = 'Software'
-            self.fps = self.fps or self.nm['AcquisitionFrameRate'].max # if self.fps is not given, pick max acquisition frame rate of camera
-            self.nm['AcquisitionFrameRate'].value = self.fps
-
+        self.nm['AcquisitionMode'].value = 'Continuous'
         if self.exp is None:
-            self.nm['AcquisitionMode'].value = 'Continuous'
             self.nm['ExposureAuto'].value = 'Continuous'
             self.exposure = "Auto"
         else:
-            self.nm['AcquisitionMode'].value = 'Continuous'
             self.nm['ExposureAuto'].value = 'Off'
             self.nm['ExposureTime'].value = self.exp or 0.99e+6 / self.nm['AcquisitionFrameRate'].value
             self.exposure = str(self.nm['ExposureTime'].value / 1000.0) + " ms"
 
-        # self.fps = self.fps or self.nm['AcquisitionFrameRate'].value # what to do with this?
+        self.nm['AcquisitionFrameRateEnable'].value = True
+        self.fps = self.fps or self.nm['AcquisitionFrameRate'].max # if self.fps is not given, pick max acquisition frame rate of camera
+        self.nm['AcquisitionFrameRate'].value = self.fps
+        if self.ext_trigger:
+            self.nm['TriggerMode'].value = "On"
+            self.nm['TriggerSelector'].value = "FrameStart" #"ExposureActive"
+            # self.nm['AcquisitionFrameRateEnable'].value = True
+            self.nm['TriggerSource'].value = 'Line2'
+            self.nm['TriggerActivation'].value = 'FallingEdge'
+            self.nm['TriggerOverlap'].value = 'PreviousFrame' # this doesn't work with ExposureActive
+        else:
+            self.nm['TriggerMode'].value = "Off"
+            # self.nm['AcquisitionFrameRateEnable'].value = True
+            self.nm['TriggerSource'].value = 'Software'
 
         for key, value in self.white_balance.items():
             if key == 'wb':
@@ -205,7 +205,7 @@ class TritonCam(BundleCam):
             print("\nROI:", self.roi)
             print("Gain:", self.gain)
             print("White Balance:", self.white_balance)
-            print("Color Correctiob:", self.color_correction)
+            print("Color Correction:", self.color_correction)
             print("Exposure:", self.exposure, "\n")
             print("FPS:", self.fps, "(actual %.3f)" % self.nm['AcquisitionFrameRate'].value)
 
@@ -317,7 +317,7 @@ def create_triton(config: dict) -> TritonCam:
     c.adc_bit_depth = str(config['adc_bit_depth'])
     c.pixel_format = str(config['pixel_format'])
     c.fps = float(config['fps'])
-    c.exp = float(config['exposure'])
+    c.exp = None if config['exposure'] is None else float(config['exposure'])
     c.bundle = int(config['bundle_size'])
     c.ext_trigger = bool(config['external_trigger'])
     c.verbose = bool(config['verbose'])
