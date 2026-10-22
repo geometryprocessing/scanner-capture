@@ -21,7 +21,7 @@ Edit `configs/config.json` (git-ignored) for the machine. Relative paths in it a
 | `data_path` | where captures are saved |
 | `dark_path` | folder with the dark frames (`dark_frame_<exposure>_sec.npy` for `ldr`, `.exr` for `hdr`) |
 | `patterns_root` | folder that contains `patterns/`; script `load` paths are relative to it |
-| `scripts_dir` | folder with the `*.script` files (`configs/scripts`) |
+| `scripts_dir` | folder with the `*.script` files (`configs/scripts`, not tracked by git: create them with `--generate_scripts` or copy them in) |
 | `camera_serial`, `packet_size` | Lucid camera serial number and GigE packet size |
 | `stage` | `{"type": "linear" \| "rotating" \| null, "port": "COM3", "speed_divider": 24}` |
 | `settle_frames` | frames to render after a pattern change before `ldr`/`hdr` (1: capture right after the new pattern has been swapped in) |
