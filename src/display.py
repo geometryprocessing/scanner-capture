@@ -127,12 +127,16 @@ class Pattern:
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, W, H, 0, GL_RGBA, GL_UNSIGNED_BYTE, new_texture)
 
     def render(self):
-        glClearColor(0.5, 0.5, 0.5, 1.0)
+        glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
 
 class Projector:
-    def __init__(self):
+    def __init__(self, settle_frames=3):
+        # number of swaps after a pattern change before it is considered on screen
+        self.settle_frames = settle_frames
+        self.frames_since_change = 0
+
         glfw.init()
 
         # detect projector by matching resolution
@@ -154,6 +158,7 @@ class Projector:
 
         self.window = glfw.create_window(W, H, "Projector", projector, None)
         glfw.make_context_current(self.window)
+        glfw.swap_interval(1)  # vsync, so swaps track displayed frames
 
         glfw.set_key_callback(self.window, self.on_keyboard)
         glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
@@ -175,10 +180,17 @@ class Projector:
     def update(self, new_pattern=None):
         if new_pattern is not None:
             self.pattern.update(new_pattern)
+            self.frames_since_change = 0
 
         self.pattern.render()
         glfw.swap_buffers(self.window)
+        self.frames_since_change += 1
         glfw.poll_events()
+
+    def pattern_settled(self, min_frames=None):
+        if min_frames is None:
+            min_frames = self.settle_frames
+        return self.frames_since_change >= min_frames
 
 def console_input(input_queue):
     last_input = None
